@@ -14,7 +14,109 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      brand_memory: {
+        Row: {
+          created_at: string
+          fact_text: string
+          id: string
+          story_source_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          fact_text: string
+          id?: string
+          story_source_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          fact_text?: string
+          id?: string
+          story_source_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_memory_story_source_id_fkey"
+            columns: ["story_source_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      media: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          story_id: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          story_id: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          story_id?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stories: {
+        Row: {
+          bucket: Database["public"]["Enums"]["story_bucket"]
+          content_json: Json
+          created_at: string
+          current_step: number
+          id: string
+          scores_json: Json | null
+          status: Database["public"]["Enums"]["story_status"]
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bucket?: Database["public"]["Enums"]["story_bucket"]
+          content_json?: Json
+          created_at?: string
+          current_step?: number
+          id?: string
+          scores_json?: Json | null
+          status?: Database["public"]["Enums"]["story_status"]
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bucket?: Database["public"]["Enums"]["story_bucket"]
+          content_json?: Json
+          created_at?: string
+          current_step?: number
+          id?: string
+          scores_json?: Json | null
+          status?: Database["public"]["Enums"]["story_status"]
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +125,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      story_bucket: "personal" | "business" | "emotional"
+      story_status: "draft" | "locked"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +253,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      story_bucket: ["personal", "business", "emotional"],
+      story_status: ["draft", "locked"],
+    },
   },
 } as const

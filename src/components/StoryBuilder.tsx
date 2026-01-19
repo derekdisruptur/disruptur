@@ -1,24 +1,94 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "./ui/button";
 import { VoiceRecordButton } from "./VoiceRecordButton";
 import { StepProgress } from "./StepIndicator";
 import { STORY_STEPS, StoryBucket } from "@/types/story";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
 
 interface StoryBuilderProps {
   onBack: () => void;
   bucket: StoryBucket;
+  storyId?: string;
 }
 
-export function StoryBuilder({ onBack, bucket }: StoryBuilderProps) {
+export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [stepContent, setStepContent] = useState<Record<number, string>>({});
   const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [dbStoryId, setDbStoryId] = useState<string | null>(storyId || null);
 
   const currentStepConfig = STORY_STEPS[currentStep - 1];
   const currentContent = stepContent[currentStep] || "";
   const canProceed = currentContent.trim().length > 10;
+
+  // Create story in database on first content entry
+  useEffect(() => {
+    async function createStory() {
+      if (!user || dbStoryId || Object.keys(stepContent).length === 0) return;
+
+      const { data, error } = await supabase
+        .from('stories')
+        .insert({
+          user_id: user.id,
+          bucket: bucket,
+          title: stepContent[1]?.slice(0, 100) || null,
+          content_json: stepContent,
+          current_step: currentStep,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating story:', error);
+        toast({
+          title: "ERROR",
+          description: "Failed to save story",
+          variant: "destructive",
+        });
+      } else if (data) {
+        setDbStoryId(data.id);
+      }
+    }
+
+    createStory();
+  }, [stepContent, user, bucket, dbStoryId, currentStep]);
+
+  // Auto-save story updates
+  const saveStory = useCallback(async () => {
+    if (!dbStoryId || !user) return;
+    
+    setIsSaving(true);
+    const { error } = await supabase
+      .from('stories')
+      .update({
+        title: stepContent[1]?.slice(0, 100) || null,
+        content_json: stepContent,
+        current_step: currentStep,
+      })
+      .eq('id', dbStoryId);
+
+    if (error) {
+      console.error('Error saving story:', error);
+    }
+    setIsSaving(false);
+  }, [dbStoryId, stepContent, currentStep, user]);
+
+  // Debounced auto-save
+  useEffect(() => {
+    if (!dbStoryId) return;
+    
+    const timer = setTimeout(() => {
+      saveStory();
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [stepContent, currentStep, saveStory, dbStoryId]);
 
   const handleTranscription = useCallback((text: string) => {
     setStepContent(prev => ({
@@ -65,6 +135,11 @@ export function StoryBuilder({ onBack, bucket }: StoryBuilderProps) {
           </button>
           
           <div className="flex items-center gap-4">
+            {isSaving && (
+              <span className="font-mono text-xs text-muted-foreground uppercase">
+                SAVING...
+              </span>
+            )}
             <span className="font-mono text-xs uppercase text-muted-foreground hidden md:block">
               {bucketLabel} STORY
             </span>

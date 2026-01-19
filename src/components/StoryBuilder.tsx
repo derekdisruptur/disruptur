@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect } from "react";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { VoiceRecordButton } from "./VoiceRecordButton";
 import { StepProgress } from "./StepIndicator";
+import { GatekeeperWarning } from "./GatekeeperWarning";
 import { STORY_STEPS, StoryBucket } from "@/types/story";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +23,11 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [dbStoryId, setDbStoryId] = useState<string | null>(storyId || null);
+  
+  // Gatekeeper state
+  const [isCheckingAuthenticity, setIsCheckingAuthenticity] = useState(false);
+  const [showGatekeeperWarning, setShowGatekeeperWarning] = useState(false);
+  const [gatekeeperReason, setGatekeeperReason] = useState<string | undefined>();
 
   const currentStepConfig = STORY_STEPS[currentStep - 1];
   const currentContent = stepContent[currentStep] || "";
@@ -105,11 +111,59 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
     }));
   };
 
-  const handleNext = () => {
-    if (currentStep < 12 && canProceed) {
-      setCurrentStep(prev => prev + 1);
-      setIsEditing(false);
+  const checkAuthenticity = async (text: string): Promise<{ isAuthentic: boolean; reason?: string }> => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-authenticity`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ text }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Authenticity check failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      return { isAuthentic: data.isAuthentic, reason: data.reason };
+    } catch (error) {
+      console.error("Authenticity check error:", error);
+      // On error, allow the user to proceed
+      return { isAuthentic: true };
     }
+  };
+
+  const handleNext = async () => {
+    if (!canProceed || currentStep === 12) return;
+
+    // Run gatekeeper check on Step 1
+    if (currentStep === 1) {
+      setIsCheckingAuthenticity(true);
+      
+      const result = await checkAuthenticity(currentContent);
+      
+      setIsCheckingAuthenticity(false);
+      
+      if (!result.isAuthentic) {
+        setGatekeeperReason(result.reason);
+        setShowGatekeeperWarning(true);
+        return;
+      }
+    }
+
+    // Proceed to next step
+    setCurrentStep(prev => prev + 1);
+    setIsEditing(false);
   };
 
   const handlePrevious = () => {
@@ -119,10 +173,22 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
     }
   };
 
+  const handleGatekeeperClose = () => {
+    setShowGatekeeperWarning(false);
+    setGatekeeperReason(undefined);
+  };
+
   const bucketLabel = bucket.toUpperCase();
 
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Gatekeeper Warning Modal */}
+      <GatekeeperWarning 
+        isOpen={showGatekeeperWarning}
+        onClose={handleGatekeeperClose}
+        reason={gatekeeperReason}
+      />
+
       {/* Header */}
       <header className="border-b-2 border-foreground">
         <div className="sanctuary-container flex items-center justify-between">
@@ -171,7 +237,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
           <div className="space-y-6">
             <VoiceRecordButton 
               onTranscription={handleTranscription}
-              disabled={false}
+              disabled={isCheckingAuthenticity}
             />
 
             <div className="flex items-center gap-4">
@@ -188,9 +254,11 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
                 onChange={handleTextChange}
                 onFocus={() => setIsEditing(true)}
                 placeholder={currentStepConfig.placeholder}
+                disabled={isCheckingAuthenticity}
                 className={cn(
                   "clinical-input min-h-[200px] resize-none body-text",
-                  "placeholder:text-muted-foreground/50"
+                  "placeholder:text-muted-foreground/50",
+                  isCheckingAuthenticity && "opacity-50"
                 )}
               />
               {currentContent && (
@@ -213,7 +281,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
             <Button
               variant="outline"
               onClick={handlePrevious}
-              disabled={currentStep === 1}
+              disabled={currentStep === 1 || isCheckingAuthenticity}
               className="gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -221,17 +289,35 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
             </Button>
 
             <div className="font-mono text-sm text-muted-foreground hidden md:block">
-              {currentStep}/12
+              {isCheckingAuthenticity ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  ANALYZING TRUTH...
+                </span>
+              ) : (
+                `${currentStep}/12`
+              )}
             </div>
 
             <Button
               variant="clinical"
               onClick={handleNext}
-              disabled={!canProceed || currentStep === 12}
+              disabled={!canProceed || currentStep === 12 || isCheckingAuthenticity}
               className="gap-2"
             >
-              {currentStep === 12 ? "COMPLETE" : "NEXT"}
-              {currentStep < 12 && <ArrowRight className="w-4 h-4" />}
+              {isCheckingAuthenticity ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  CHECKING...
+                </>
+              ) : currentStep === 12 ? (
+                "COMPLETE"
+              ) : (
+                <>
+                  NEXT
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </Button>
           </div>
         </div>

@@ -132,7 +132,7 @@ export function Dashboard() {
     { id: 'all', label: 'ALL' },
     { id: 'personal', label: 'PERSONAL' },
     { id: 'business', label: 'BUSINESS' },
-    { id: 'emotional', label: 'EMOTIONAL' },
+    { id: 'emotional', label: 'INDUSTRY' },
   ];
 
   return (

@@ -23,6 +23,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [dbStoryId, setDbStoryId] = useState<string | null>(storyId || null);
+  const [isCreatingStory, setIsCreatingStory] = useState(false);
   
   // Gatekeeper state
   const [isCheckingAuthenticity, setIsCheckingAuthenticity] = useState(false);
@@ -33,17 +34,21 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
   const currentContent = stepContent[currentStep] || "";
   const canProceed = currentContent.trim().length > 10;
 
-  // Create story in database on first content entry
+  // Create story in database on first content entry (only once)
   useEffect(() => {
     async function createStory() {
-      if (!user || dbStoryId || Object.keys(stepContent).length === 0) return;
+      // Only create if: user exists, no story ID yet, not already creating, has content
+      if (!user || dbStoryId || isCreatingStory || Object.keys(stepContent).length === 0) return;
+      
+      // Prevent duplicate creation
+      setIsCreatingStory(true);
 
       const { data, error } = await supabase
         .from('stories')
         .insert({
           user_id: user.id,
           bucket: bucket,
-          title: stepContent[1]?.slice(0, 100) || null,
+          title: null, // Don't set title on creation - wait for save
           content_json: stepContent,
           current_step: currentStep,
         })
@@ -52,6 +57,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
 
       if (error) {
         console.error('Error creating story:', error);
+        setIsCreatingStory(false);
         toast({
           title: "ERROR",
           description: "Failed to save story",
@@ -63,7 +69,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
     }
 
     createStory();
-  }, [stepContent, user, bucket, dbStoryId, currentStep]);
+  }, [stepContent, user, bucket, dbStoryId, currentStep, isCreatingStory]);
 
   // Auto-save story updates
   const saveStory = useCallback(async () => {

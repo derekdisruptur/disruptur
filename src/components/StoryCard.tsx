@@ -10,7 +10,7 @@ interface StoryCardProps {
 const bucketLabels: Record<StoryBucket, string> = {
   personal: "PERSONAL",
   business: "BUSINESS",
-  emotional: "EMOTIONAL",
+  emotional: "INDUSTRY",
 };
 
 export function StoryCard({ story, onClick }: StoryCardProps) {

@@ -22,9 +22,9 @@ const buckets: { id: StoryBucket; label: string; icon: typeof User; description:
   },
   {
     id: "emotional",
-    label: "EMOTIONAL",
+    label: "INDUSTRY",
     icon: Heart,
-    description: "relationships, loss, vulnerability, growth",
+    description: "sector insights, market truths, professional growth",
   },
 ];
 

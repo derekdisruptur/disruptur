@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, Loader2, Lock } from "lucide-react";
 import { Button } from "./ui/button";
 import { VoiceRecordButton } from "./VoiceRecordButton";
 import { StepProgress } from "./StepIndicator";
-import { GatekeeperWarning } from "./GatekeeperWarning";
+import { StoryCoachNudge } from "./StoryCoachNudge";
 import { ScoreDisplay } from "./ScoreDisplay";
 import { STORY_STEPS, StoryBucket, StoryScores } from "@/types/story";
 import { useAuth } from "@/hooks/useAuth";
@@ -26,10 +26,10 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
   const [dbStoryId, setDbStoryId] = useState<string | null>(storyId || null);
   const [isCreatingStory, setIsCreatingStory] = useState(false);
   
-  // Gatekeeper state
+  // Story Coach state
   const [isCheckingAuthenticity, setIsCheckingAuthenticity] = useState(false);
-  const [showGatekeeperWarning, setShowGatekeeperWarning] = useState(false);
-  const [gatekeeperReason, setGatekeeperReason] = useState<string | undefined>();
+  const [showCoachNudge, setShowCoachNudge] = useState(false);
+  const [coachNudgeMessage, setCoachNudgeMessage] = useState<string | undefined>();
   
   // Scoring state
   const [isScoring, setIsScoring] = useState(false);
@@ -122,7 +122,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
     }));
   };
 
-  const checkAuthenticity = async (text: string): Promise<{ isAuthentic: boolean; reason?: string }> => {
+  const checkAuthenticity = async (text: string): Promise<{ needsRefinement: boolean; softNudge?: string }> => {
     try {
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-authenticity`,
@@ -146,10 +146,10 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
         throw new Error(data.error);
       }
 
-      return { isAuthentic: data.isAuthentic, reason: data.reason };
+      return { needsRefinement: data.needsRefinement, softNudge: data.softNudge };
     } catch (error) {
       console.error("Authenticity check error:", error);
-      return { isAuthentic: true };
+      return { needsRefinement: false };
     }
   };
 
@@ -244,7 +244,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
       return;
     }
 
-    // Run gatekeeper check on Step 1
+    // Run coach check on Step 1
     if (currentStep === 1) {
       setIsCheckingAuthenticity(true);
       
@@ -252,9 +252,9 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
       
       setIsCheckingAuthenticity(false);
       
-      if (!result.isAuthentic) {
-        setGatekeeperReason(result.reason);
-        setShowGatekeeperWarning(true);
+      if (result.needsRefinement) {
+        setCoachNudgeMessage(result.softNudge);
+        setShowCoachNudge(true);
         return;
       }
     }
@@ -271,9 +271,17 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
     }
   };
 
-  const handleGatekeeperClose = () => {
-    setShowGatekeeperWarning(false);
-    setGatekeeperReason(undefined);
+  const handleCoachRevise = () => {
+    setShowCoachNudge(false);
+    setCoachNudgeMessage(undefined);
+  };
+
+  const handleCoachContinue = () => {
+    setShowCoachNudge(false);
+    setCoachNudgeMessage(undefined);
+    // Proceed to next step anyway
+    setCurrentStep(prev => prev + 1);
+    setIsEditing(false);
   };
 
   const handleScoreClose = () => {
@@ -286,11 +294,12 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Gatekeeper Warning Modal */}
-      <GatekeeperWarning 
-        isOpen={showGatekeeperWarning}
-        onClose={handleGatekeeperClose}
-        reason={gatekeeperReason}
+      {/* Story Coach Nudge Modal */}
+      <StoryCoachNudge 
+        isOpen={showCoachNudge}
+        onRevise={handleCoachRevise}
+        onContinue={handleCoachContinue}
+        softNudge={coachNudgeMessage}
       />
 
       {/* Score Display */}

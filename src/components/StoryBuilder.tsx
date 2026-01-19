@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect } from "react";
-import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Lock } from "lucide-react";
 import { Button } from "./ui/button";
 import { VoiceRecordButton } from "./VoiceRecordButton";
 import { StepProgress } from "./StepIndicator";
 import { GatekeeperWarning } from "./GatekeeperWarning";
-import { STORY_STEPS, StoryBucket } from "@/types/story";
+import { ScoreDisplay } from "./ScoreDisplay";
+import { STORY_STEPS, StoryBucket, StoryScores } from "@/types/story";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -29,18 +30,22 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
   const [isCheckingAuthenticity, setIsCheckingAuthenticity] = useState(false);
   const [showGatekeeperWarning, setShowGatekeeperWarning] = useState(false);
   const [gatekeeperReason, setGatekeeperReason] = useState<string | undefined>();
+  
+  // Scoring state
+  const [isScoring, setIsScoring] = useState(false);
+  const [scores, setScores] = useState<StoryScores & { summary?: string } | null>(null);
+  const [showScoreDisplay, setShowScoreDisplay] = useState(false);
 
   const currentStepConfig = STORY_STEPS[currentStep - 1];
   const currentContent = stepContent[currentStep] || "";
   const canProceed = currentContent.trim().length > 10;
+  const isLastStep = currentStep === 12;
 
   // Create story in database on first content entry (only once)
   useEffect(() => {
     async function createStory() {
-      // Only create if: user exists, no story ID yet, not already creating, has content
       if (!user || dbStoryId || isCreatingStory || Object.keys(stepContent).length === 0) return;
       
-      // Prevent duplicate creation
       setIsCreatingStory(true);
 
       const { data, error } = await supabase
@@ -48,7 +53,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
         .insert({
           user_id: user.id,
           bucket: bucket,
-          title: null, // Don't set title on creation - wait for save
+          title: null,
           content_json: stepContent,
           current_step: currentStep,
         })
@@ -144,13 +149,100 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
       return { isAuthentic: data.isAuthentic, reason: data.reason };
     } catch (error) {
       console.error("Authenticity check error:", error);
-      // On error, allow the user to proceed
       return { isAuthentic: true };
     }
   };
 
+  const scoreStory = async (): Promise<StoryScores & { summary?: string } | null> => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/score-story`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ content: stepContent }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Scoring failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      return data;
+    } catch (error) {
+      console.error("Scoring error:", error);
+      toast({
+        title: "SCORING FAILED",
+        description: "could not analyze your story. try again.",
+        variant: "destructive",
+      });
+      return null;
+    }
+  };
+
+  const handleComplete = async () => {
+    if (!canProceed || !dbStoryId) return;
+
+    setIsScoring(true);
+    
+    // Score the story
+    const storyScores = await scoreStory();
+    
+    if (!storyScores) {
+      setIsScoring(false);
+      return;
+    }
+
+    // Save scores and lock the story
+    const { error } = await supabase
+      .from('stories')
+      .update({
+        title: stepContent[1]?.slice(0, 100) || null,
+        content_json: stepContent,
+        current_step: 12,
+        status: 'locked',
+        scores_json: {
+          authenticity: storyScores.authenticity,
+          vulnerability: storyScores.vulnerability,
+          credibility: storyScores.credibility,
+          cringeRisk: storyScores.cringeRisk,
+        },
+      })
+      .eq('id', dbStoryId);
+
+    if (error) {
+      console.error('Error locking story:', error);
+      toast({
+        title: "ERROR",
+        description: "Failed to lock story",
+        variant: "destructive",
+      });
+      setIsScoring(false);
+      return;
+    }
+
+    setScores(storyScores);
+    setShowScoreDisplay(true);
+    setIsScoring(false);
+  };
+
   const handleNext = async () => {
-    if (!canProceed || currentStep === 12) return;
+    if (!canProceed) return;
+
+    // If on last step, handle completion
+    if (isLastStep) {
+      await handleComplete();
+      return;
+    }
 
     // Run gatekeeper check on Step 1
     if (currentStep === 1) {
@@ -184,7 +276,13 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
     setGatekeeperReason(undefined);
   };
 
+  const handleScoreClose = () => {
+    setShowScoreDisplay(false);
+    onBack();
+  };
+
   const bucketLabel = bucket.toUpperCase();
+  const isProcessing = isCheckingAuthenticity || isScoring;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -195,12 +293,24 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
         reason={gatekeeperReason}
       />
 
+      {/* Score Display */}
+      {showScoreDisplay && scores && (
+        <ScoreDisplay 
+          scores={scores}
+          onClose={handleScoreClose}
+        />
+      )}
+
       {/* Header */}
       <header className="border-b-2 border-foreground">
         <div className="sanctuary-container flex items-center justify-between">
           <button 
             onClick={onBack}
-            className="flex items-center gap-2 font-mono text-sm uppercase hover:text-muted-foreground transition-colors"
+            disabled={isProcessing}
+            className={cn(
+              "flex items-center gap-2 font-mono text-sm uppercase hover:text-muted-foreground transition-colors",
+              isProcessing && "opacity-50 cursor-not-allowed"
+            )}
           >
             <ArrowLeft className="w-4 h-4" />
             EXIT
@@ -230,6 +340,11 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
                 STEP {currentStep.toString().padStart(2, '0')}
               </span>
               <div className="flex-1 h-[1px] bg-muted" />
+              {isLastStep && (
+                <span className="font-mono text-xs uppercase text-accent font-bold">
+                  FINAL STEP
+                </span>
+              )}
             </div>
             <h1 className="font-mono font-bold text-3xl md:text-4xl uppercase tracking-tighter-custom">
               {currentStepConfig.title}
@@ -243,7 +358,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
           <div className="space-y-6">
             <VoiceRecordButton 
               onTranscription={handleTranscription}
-              disabled={isCheckingAuthenticity}
+              disabled={isProcessing}
             />
 
             <div className="flex items-center gap-4">
@@ -260,11 +375,11 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
                 onChange={handleTextChange}
                 onFocus={() => setIsEditing(true)}
                 placeholder={currentStepConfig.placeholder}
-                disabled={isCheckingAuthenticity}
+                disabled={isProcessing}
                 className={cn(
                   "clinical-input min-h-[200px] resize-none body-text",
                   "placeholder:text-muted-foreground/50",
-                  isCheckingAuthenticity && "opacity-50"
+                  isProcessing && "opacity-50"
                 )}
               />
               {currentContent && (
@@ -287,7 +402,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
             <Button
               variant="outline"
               onClick={handlePrevious}
-              disabled={currentStep === 1 || isCheckingAuthenticity}
+              disabled={currentStep === 1 || isProcessing}
               className="gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -300,6 +415,11 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
                   <Loader2 className="w-4 h-4 animate-spin" />
                   ANALYZING TRUTH...
                 </span>
+              ) : isScoring ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  SCORING STORY...
+                </span>
               ) : (
                 `${currentStep}/12`
               )}
@@ -308,7 +428,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
             <Button
               variant="clinical"
               onClick={handleNext}
-              disabled={!canProceed || currentStep === 12 || isCheckingAuthenticity}
+              disabled={!canProceed || isProcessing}
               className="gap-2"
             >
               {isCheckingAuthenticity ? (
@@ -316,8 +436,16 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
                   <Loader2 className="w-4 h-4 animate-spin" />
                   CHECKING...
                 </>
-              ) : currentStep === 12 ? (
-                "COMPLETE"
+              ) : isScoring ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  SCORING...
+                </>
+              ) : isLastStep ? (
+                <>
+                  <Lock className="w-4 h-4" />
+                  LOCK & SCORE
+                </>
               ) : (
                 <>
                   NEXT

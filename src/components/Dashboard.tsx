@@ -1,23 +1,57 @@
 import { useState, useEffect } from "react";
-import { Plus, Filter } from "lucide-react";
+import { Plus, Filter, LogOut } from "lucide-react";
 import { Button } from "./ui/button";
 import { StoryCard } from "./StoryCard";
 import { EmptyState } from "./EmptyState";
 import { BucketSelector } from "./BucketSelector";
 import { StoryBuilder } from "./StoryBuilder";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { Story, StoryBucket } from "@/types/story";
-
-// Mock data for development
-const mockStories: Story[] = [];
 
 type FilterType = 'all' | StoryBucket;
 
 export function Dashboard() {
-  const [stories, setStories] = useState<Story[]>(mockStories);
+  const { user, signOut } = useAuth();
+  const [stories, setStories] = useState<Story[]>([]);
   const [filter, setFilter] = useState<FilterType>('all');
   const [showBucketSelector, setShowBucketSelector] = useState(false);
   const [selectedBucket, setSelectedBucket] = useState<StoryBucket | null>(null);
   const [activeStoryId, setActiveStoryId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch stories from database
+  useEffect(() => {
+    async function fetchStories() {
+      if (!user) return;
+      
+      const { data, error } = await supabase
+        .from('stories')
+        .select('*')
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching stories:', error);
+      } else if (data) {
+        const mappedStories: Story[] = data.map(s => ({
+          id: s.id,
+          userId: s.user_id,
+          title: s.title || '',
+          bucket: s.bucket as StoryBucket,
+          status: s.status as 'draft' | 'locked',
+          currentStep: s.current_step,
+          content: s.content_json as unknown as Story['content'],
+          scores: s.scores_json as unknown as Story['scores'],
+          createdAt: new Date(s.created_at),
+          updatedAt: new Date(s.updated_at),
+        }));
+        setStories(mappedStories);
+      }
+      setLoading(false);
+    }
+
+    fetchStories();
+  }, [user]);
 
   // Keyboard shortcut for creating a story
   useEffect(() => {
@@ -48,6 +82,30 @@ export function Dashboard() {
   const handleBackFromBuilder = () => {
     setSelectedBucket(null);
     setActiveStoryId(null);
+    // Refresh stories
+    if (user) {
+      supabase
+        .from('stories')
+        .select('*')
+        .order('updated_at', { ascending: false })
+        .then(({ data }) => {
+          if (data) {
+            const mappedStories: Story[] = data.map(s => ({
+              id: s.id,
+              userId: s.user_id,
+              title: s.title || '',
+              bucket: s.bucket as StoryBucket,
+              status: s.status as 'draft' | 'locked',
+              currentStep: s.current_step,
+              content: s.content_json as unknown as Story['content'],
+              scores: s.scores_json as unknown as Story['scores'],
+              createdAt: new Date(s.created_at),
+              updatedAt: new Date(s.updated_at),
+            }));
+            setStories(mappedStories);
+          }
+        });
+    }
   };
 
   const handleStoryClick = (story: Story) => {
@@ -91,21 +149,36 @@ export function Dashboard() {
             </span>
           </div>
           
-          <Button
-            variant="clinical"
-            size="sm"
-            onClick={handleCreateStory}
-            className="gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">NEW STORY</span>
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="clinical"
+              size="sm"
+              onClick={handleCreateStory}
+              className="gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">NEW STORY</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={signOut}
+              className="gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">EXIT</span>
+            </Button>
+          </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="flex-1 sanctuary-container">
-        {stories.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <span className="font-mono text-muted-foreground uppercase">LOADING...</span>
+          </div>
+        ) : stories.length === 0 ? (
           <EmptyState onCreateStory={handleCreateStory} />
         ) : (
           <div className="space-y-8">

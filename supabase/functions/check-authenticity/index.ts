@@ -30,6 +30,8 @@ serve(async (req) => {
   
   "task": "Analyze the user's input for 'Performance Signals' vs. 'Raw Truth'.",
   
+  "Sensitivity Calibration": "Set your threshold HIGH. Only return needsRefinement: true when the text has 3 or more clear, strong performance signals. A single buzzword or polished sentence is NOT enough. Casual, conversational text should always pass, even if imperfect. Err on the side of letting the user through. Only flag if the text feels overtly performative or reads like marketing copy. When in doubt, let them through.",
+
   "Performance Signals (Flags for Coaching)": [
     "Heavy use of corporate jargon (e.g., 'leverage', 'synergy', 'unlock')",
     "Formatting designed for 'scrolling' (hashtags, lists, perfect hooks)",
@@ -45,7 +47,7 @@ serve(async (req) => {
     "First-person ownership of feelings ('I felt scared' vs 'It was a scary time')"
   ],
   
-  "Output Logic": "If the text feels 'Performative', provide a gentle nudge to ground them back in reality. If it feels 'Raw', encourage them to proceed.",
+  "Output Logic": "Default to needsRefinement: false unless the text is clearly and overtly performative with multiple strong signals. If it feels 'Raw' or even just normal/casual, let them through.",
   
   "Response Format": "JSON only: { \"needsRefinement\": boolean, \"softNudge\": \"A short, empathetic question or observation to help them drop the act. Max 1 sentence.\" }"
 }`;
@@ -62,7 +64,7 @@ serve(async (req) => {
           { role: "system", content: systemPrompt },
           { role: "user", content: `Analyze this text for authenticity:\n\n"${text}"` }
         ],
-        temperature: 0.3,
+        temperature: 0.2,
         max_tokens: 200,
       }),
     });
@@ -89,7 +91,7 @@ serve(async (req) => {
     } catch {
       console.error("Failed to parse GPT response:", content);
       // Default to authentic if we can't parse
-      result = { isAuthentic: true, reason: null };
+      result = { needsRefinement: false, softNudge: null };
     }
 
     return new Response(

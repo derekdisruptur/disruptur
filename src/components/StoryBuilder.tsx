@@ -36,10 +36,50 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
   const [scores, setScores] = useState<StoryScores & { summary?: string } | null>(null);
   const [showScoreDisplay, setShowScoreDisplay] = useState(false);
 
+  const [isLoadingDraft, setIsLoadingDraft] = useState(!!storyId);
+
   const currentStepConfig = STORY_STEPS[currentStep - 1];
   const currentContent = stepContent[currentStep] || "";
   const canProceed = currentContent.trim().length > 10;
   const isLastStep = currentStep === 12;
+
+  // Load existing draft from database
+  useEffect(() => {
+    async function loadDraft() {
+      if (!storyId || !user) return;
+
+      const { data, error } = await supabase
+        .from('stories')
+        .select('*')
+        .eq('id', storyId)
+        .single();
+
+      if (error) {
+        console.error('Error loading draft:', error);
+        toast({
+          title: "ERROR",
+          description: "Failed to load draft",
+          variant: "destructive",
+        });
+      } else if (data) {
+        const content = data.content_json as Record<string, string> | null;
+        if (content && typeof content === 'object') {
+          // Convert string keys back to number keys
+          const numbered: Record<number, string> = {};
+          for (const [key, value] of Object.entries(content)) {
+            numbered[Number(key)] = value as string;
+          }
+          setStepContent(numbered);
+        }
+        setCurrentStep(data.current_step);
+        setDbStoryId(data.id);
+        setIsEditing(true);
+      }
+      setIsLoadingDraft(false);
+    }
+
+    loadDraft();
+  }, [storyId, user]);
 
   // Create story in database on first content entry (only once)
   useEffect(() => {
@@ -291,6 +331,17 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
 
   const bucketLabel = bucket.toUpperCase();
   const isProcessing = isCheckingAuthenticity || isScoring;
+
+  if (isLoadingDraft) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <span className="font-mono text-muted-foreground uppercase flex items-center gap-2">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          LOADING DRAFT...
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">

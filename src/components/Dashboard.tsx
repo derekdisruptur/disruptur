@@ -113,7 +113,10 @@ export function Dashboard() {
     setSelectedBucket(story.bucket);
   };
 
-  // Show Story Builder
+  // Show Story Builder (new story or resuming a draft)
+  if (selectedBucket && activeStoryId) {
+    return <StoryBuilder bucket={selectedBucket} onBack={handleBackFromBuilder} storyId={activeStoryId} />;
+  }
   if (selectedBucket && !activeStoryId) {
     return <StoryBuilder bucket={selectedBucket} onBack={handleBackFromBuilder} />;
   }

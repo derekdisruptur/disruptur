@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.score-story]
 verify_jwt = false
+
+[functions.send-recap-email]
+verify_jwt = false

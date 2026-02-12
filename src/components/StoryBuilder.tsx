@@ -229,12 +229,42 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
     }
   };
 
+  const sendRecapEmail = async (
+    storyScores: StoryScores & { summary?: string },
+  ) => {
+    if (!user?.email) return;
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-recap-email`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            email: user.email,
+            scores: storyScores,
+            content: stepContent,
+            bucket,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        console.error("Recap email failed:", response.status);
+      }
+    } catch (error) {
+      console.error("Recap email error:", error);
+    }
+  };
+
   const handleComplete = async () => {
     if (!canProceed || !dbStoryId) return;
 
     setIsScoring(true);
     
-    // Score the story
     const storyScores = await scoreStory();
     
     if (!storyScores) {
@@ -269,6 +299,9 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
       setIsScoring(false);
       return;
     }
+
+    // Send recap email (fire-and-forget, don't block the UI)
+    sendRecapEmail(storyScores);
 
     setScores(storyScores);
     setShowScoreDisplay(true);

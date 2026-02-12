@@ -20,7 +20,7 @@ interface StoryBuilderProps {
 
 export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
   const { user } = useAuth();
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(0);
   const [stepContent, setStepContent] = useState<Record<number, string>>({});
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -38,11 +38,13 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
   const [showScoreDisplay, setShowScoreDisplay] = useState(false);
 
   const [inspirationImageUrl, setInspirationImageUrl] = useState<string | null>(null);
+  const [inspirationText, setInspirationText] = useState("");
   const [isLoadingDraft, setIsLoadingDraft] = useState(!!storyId);
 
-  const currentStepConfig = STORY_STEPS[currentStep - 1];
+  const isInspirationStep = currentStep === 0;
+  const currentStepConfig = isInspirationStep ? null : STORY_STEPS[currentStep - 1];
   const currentContent = stepContent[currentStep] || "";
-  const canProceed = currentContent.trim().length > 10;
+  const canProceed = isInspirationStep ? true : currentContent.trim().length > 10;
   const isLastStep = currentStep === 12;
 
   // Load existing draft from database
@@ -79,6 +81,9 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
         if (data.inspiration_image_url) {
           setInspirationImageUrl(data.inspiration_image_url);
         }
+        if ((data as any).inspiration_text) {
+          setInspirationText((data as any).inspiration_text);
+        }
       }
       setIsLoadingDraft(false);
     }
@@ -89,7 +94,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
   // Create story in database on first content entry (only once)
   useEffect(() => {
     async function createStory() {
-      if (!user || dbStoryId || isCreatingStory || Object.keys(stepContent).length === 0) return;
+      if (!user || dbStoryId || isCreatingStory || (Object.keys(stepContent).length === 0 && !inspirationText && !inspirationImageUrl)) return;
       
       setIsCreatingStory(true);
 
@@ -102,6 +107,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
           content_json: stepContent,
           current_step: currentStep,
           inspiration_image_url: inspirationImageUrl,
+          inspiration_text: inspirationText,
         })
         .select()
         .single();
@@ -120,7 +126,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
     }
 
     createStory();
-  }, [stepContent, user, bucket, dbStoryId, currentStep, isCreatingStory]);
+  }, [stepContent, user, bucket, dbStoryId, currentStep, isCreatingStory, inspirationText, inspirationImageUrl]);
 
   // Auto-save story updates
   const saveStory = useCallback(async () => {
@@ -134,6 +140,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
         content_json: stepContent,
         current_step: currentStep,
         inspiration_image_url: inspirationImageUrl,
+        inspiration_text: inspirationText,
       })
       .eq('id', dbStoryId);
 
@@ -141,7 +148,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
       console.error('Error saving story:', error);
     }
     setIsSaving(false);
-  }, [dbStoryId, stepContent, currentStep, user, inspirationImageUrl]);
+  }, [dbStoryId, stepContent, currentStep, user, inspirationImageUrl, inspirationText]);
 
   // Debounced auto-save
   useEffect(() => {
@@ -318,6 +325,13 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
   const handleNext = async () => {
     if (!canProceed) return;
 
+    // Inspiration step (step 0) - just proceed, no checks
+    if (isInspirationStep) {
+      setCurrentStep(1);
+      setIsEditing(false);
+      return;
+    }
+
     // If on last step, handle completion
     if (isLastStep) {
       await handleComplete();
@@ -356,9 +370,11 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
   };
 
   const handlePrevious = () => {
-    if (currentStep > 1) {
+    if (currentStep > 0) {
       setCurrentStep(prev => prev - 1);
-      setIsEditing(stepContent[currentStep - 1]?.length > 0);
+      if (currentStep - 1 > 0) {
+        setIsEditing(stepContent[currentStep - 1]?.length > 0);
+      }
     }
   };
 
@@ -444,87 +460,124 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
       {/* Main Content */}
       <main className="flex-1 sanctuary-container">
         <div className="max-w-3xl mx-auto">
-          {/* Step Header */}
-          <div className="mb-12 space-y-4">
-            <div className="flex items-center gap-4">
-              <span className="font-mono text-sm text-muted-foreground">
-                STEP {currentStep.toString().padStart(2, '0')}
-              </span>
-              <div className="flex-1 h-[1px] bg-muted" />
-              {isLastStep && (
-                <span className="font-mono text-xs uppercase text-accent font-bold">
-                  FINAL STEP
-                </span>
-              )}
-            </div>
-            <h1 className="font-mono font-bold text-3xl md:text-4xl uppercase tracking-tighter-custom">
-              {currentStepConfig.title}
-            </h1>
-            <p className="font-mono text-lg text-muted-foreground body-text">
-              {currentStepConfig.prompt}
-            </p>
-          </div>
-
-          {/* Inspiration Image - shown on step 1 */}
-          {currentStep === 1 && (
-            <div className="mb-8">
-              <InspirationImageUpload
-                imageUrl={inspirationImageUrl}
-                onImageChange={setInspirationImageUrl}
-                disabled={isProcessing}
-              />
-            </div>
-          )}
-
-          {/* Input Area */}
-          <div className="space-y-6">
-            <VoiceRecordButton 
-              onTranscription={handleTranscription}
-              disabled={isProcessing}
-            />
-
-            <div className="flex items-center gap-4">
-              <div className="flex-1 h-[1px] bg-muted" />
-              <span className="font-mono text-xs text-muted-foreground uppercase">
-                or type below
-              </span>
-              <div className="flex-1 h-[1px] bg-muted" />
-            </div>
-
-            <div className="relative">
-              <textarea
-                value={currentContent}
-                onChange={handleTextChange}
-                onFocus={() => setIsEditing(true)}
-                placeholder={currentStepConfig.placeholder}
-                disabled={isProcessing}
-                className={cn(
-                  "clinical-input min-h-[200px] resize-none body-text",
-                  "placeholder:text-muted-foreground/50",
-                  isProcessing && "opacity-50"
-                )}
-              />
-              {currentContent && (
-                <div className="absolute bottom-4 right-4 font-mono text-xs text-muted-foreground">
-                  {currentContent.length} chars
+          {isInspirationStep ? (
+            <>
+              {/* Inspiration Pre-Step */}
+              <div className="mb-12 space-y-4">
+                <div className="flex items-center gap-4">
+                  <span className="font-mono text-sm text-muted-foreground">
+                    BEFORE WE BEGIN
+                  </span>
+                  <div className="flex-1 h-[1px] bg-muted" />
                 </div>
-              )}
-            </div>
+                <h1 className="font-mono font-bold text-3xl md:text-4xl uppercase tracking-tighter-custom">
+                  THE SPARK
+                </h1>
+                <p className="font-mono text-lg text-muted-foreground body-text">
+                  what inspired this story? was it a song? a movie? a person in your life? something that happened at work?
+                </p>
+              </div>
 
-            {/* Minimum requirement hint */}
-            {currentContent.length > 0 && currentContent.length < 11 && (
-              <p className="font-mono text-xs text-muted-foreground">
-                keep going. minimum 10 characters required.
-              </p>
-            )}
-          </div>
+              <div className="space-y-8">
+                <div className="space-y-3">
+                  <label className="font-mono text-xs uppercase text-muted-foreground">
+                    DESCRIBE YOUR INSPIRATION
+                  </label>
+                  <textarea
+                    value={inspirationText}
+                    onChange={(e) => setInspirationText(e.target.value)}
+                    placeholder="a conversation i overheard, a lyric that wouldn't leave my head, the look on someone's face..."
+                    className={cn(
+                      "clinical-input min-h-[120px] resize-none body-text",
+                      "placeholder:text-muted-foreground/50"
+                    )}
+                  />
+                  <p className="font-mono text-[10px] text-muted-foreground/60">
+                    THIS IS JUST FOR YOU. IT WON'T BE SCORED.
+                  </p>
+                </div>
+
+                <InspirationImageUpload
+                  imageUrl={inspirationImageUrl}
+                  onImageChange={setInspirationImageUrl}
+                  disabled={false}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Step Header */}
+              <div className="mb-12 space-y-4">
+                <div className="flex items-center gap-4">
+                  <span className="font-mono text-sm text-muted-foreground">
+                    STEP {currentStep.toString().padStart(2, '0')}
+                  </span>
+                  <div className="flex-1 h-[1px] bg-muted" />
+                  {isLastStep && (
+                    <span className="font-mono text-xs uppercase text-accent font-bold">
+                      FINAL STEP
+                    </span>
+                  )}
+                </div>
+                <h1 className="font-mono font-bold text-3xl md:text-4xl uppercase tracking-tighter-custom">
+                  {currentStepConfig!.title}
+                </h1>
+                <p className="font-mono text-lg text-muted-foreground body-text">
+                  {currentStepConfig!.prompt}
+                </p>
+              </div>
+
+              {/* Input Area */}
+              <div className="space-y-6">
+                <VoiceRecordButton 
+                  onTranscription={handleTranscription}
+                  disabled={isProcessing}
+                />
+
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 h-[1px] bg-muted" />
+                  <span className="font-mono text-xs text-muted-foreground uppercase">
+                    or type below
+                  </span>
+                  <div className="flex-1 h-[1px] bg-muted" />
+                </div>
+
+                <div className="relative">
+                  <textarea
+                    value={currentContent}
+                    onChange={handleTextChange}
+                    onFocus={() => setIsEditing(true)}
+                    placeholder={currentStepConfig!.placeholder}
+                    disabled={isProcessing}
+                    className={cn(
+                      "clinical-input min-h-[200px] resize-none body-text",
+                      "placeholder:text-muted-foreground/50",
+                      isProcessing && "opacity-50"
+                    )}
+                  />
+                  {currentContent && (
+                    <div className="absolute bottom-4 right-4 font-mono text-xs text-muted-foreground">
+                      {currentContent.length} chars
+                    </div>
+                  )}
+                </div>
+
+                {/* Minimum requirement hint */}
+                {currentContent.length > 0 && currentContent.length < 11 && (
+                  <p className="font-mono text-xs text-muted-foreground">
+                    keep going. minimum 10 characters required.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
 
           {/* Navigation */}
           <div className="flex items-center justify-between mt-12 pt-8 border-t-2 border-foreground">
             <Button
               variant="outline"
               onClick={handlePrevious}
-              disabled={currentStep === 1 || isProcessing}
+              disabled={currentStep === 0 || isProcessing}
               className="gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -542,6 +595,8 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
                   <Loader2 className="w-4 h-4 animate-spin" />
                   SCORING STORY...
                 </span>
+              ) : isInspirationStep ? (
+                "SET THE TABLE"
               ) : (
                 `${currentStep}/12`
               )}
@@ -562,6 +617,11 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   SCORING...
+                </>
+              ) : isInspirationStep ? (
+                <>
+                  BEGIN
+                  <ArrowRight className="w-4 h-4" />
                 </>
               ) : isLastStep ? (
                 <>

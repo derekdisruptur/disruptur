@@ -20,7 +20,8 @@ interface StoryBuilderProps {
 
 export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
   const { user } = useAuth();
-  const [currentStep, setCurrentStep] = useState(0);
+  const hasSparkStep = bucket === 'personal' || bucket === 'emotional';
+  const [currentStep, setCurrentStep] = useState(hasSparkStep ? 0 : 1);
   const [stepContent, setStepContent] = useState<Record<number, string>>({});
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -577,7 +578,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
             <Button
               variant="outline"
               onClick={handlePrevious}
-              disabled={currentStep === 0 || isProcessing}
+              disabled={(hasSparkStep ? currentStep === 0 : currentStep === 1) || isProcessing}
               className="gap-2"
             >
               <ArrowLeft className="w-4 h-4" />

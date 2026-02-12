@@ -31,25 +31,46 @@ serve(async (req) => {
       .map(([step, text]) => `Step ${step}: ${text}`)
       .join("\n\n");
 
-    const systemPrompt = `You are a story analyst. Score this personal story on 4 dimensions from 0-100.
+    const systemPrompt = `You are a story analyst for The Sanctuary — a platform for raw, unfiltered personal stories. Score this story on 4 dimensions from 0-100.
+
+CRITICAL VIOLATIONS — These should dramatically impact scores:
+
+HOOKS (severely penalize):
+- Attention-grabbing opening lines designed to "stop the scroll" (e.g., "I almost died that day", "What happened next changed everything", "Nobody talks about this but...")
+- Clickbait-style teasing, withholding information for dramatic effect
+- Manufactured suspense or cliffhanger language
+- Opening with a provocative question aimed at an audience
+- Any language that feels engineered to capture attention rather than honestly recount a moment
+
+CALLS TO ACTION (severely penalize):
+- Telling the reader what to do ("Share this if...", "Drop a comment", "Follow me for more", "Tag someone who...")
+- Promoting a product, service, course, link, or brand
+- Asking for engagement, follows, shares, or subscriptions
+- Directing people to a website, podcast, newsletter, or social profile
+- "DM me", "Link in bio", "Check out my..."
+- Subtle CTAs disguised as advice ("If you want to learn more about X...")
 
 SCORING CRITERIA:
 
 1. AUTHENTICITY (0-100):
    - High: Specific details, sensory language, admits uncertainty, lowercase/raw tone
    - Low: Generic statements, polished language, sounds rehearsed, clichés
+   - PENALTY: If hooks are detected, cap authenticity at 40 maximum. Hooks signal performance, not truth.
 
 2. VULNERABILITY (0-100):
    - High: Shares actual emotions, admits mistakes without justification, reveals internal conflict
    - Low: Surface-level sharing, always has an answer, distances from emotion
+   - PENALTY: If CTAs are detected, cap vulnerability at 30 maximum. You can't be vulnerable while selling.
 
 3. CREDIBILITY (0-100):
    - High: Consistent timeline, specific names/places/dates, logical cause-effect
    - Low: Vague details, timeline jumps, claims without evidence
+   - PENALTY: Hooks and CTAs both reduce credibility by 20 points each — they signal the story serves an agenda.
 
 4. CRINGE RISK (0-100):
    - High (bad): Humble brags, forced lessons, "journey" language, trying too hard
    - Low (good): Natural voice, earned insights, proportional emotion
+   - PENALTY: Any hook adds +25 to cringe risk. Any CTA adds +30 to cringe risk. Both together = cap at 85 minimum.
 
 Return JSON only:
 {
@@ -57,6 +78,8 @@ Return JSON only:
   "vulnerability": number,
   "credibility": number,
   "cringeRisk": number,
+  "hookDetected": boolean,
+  "ctaDetected": boolean,
   "summary": "One sentence overall assessment"
 }`;
 

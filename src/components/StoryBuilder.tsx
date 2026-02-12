@@ -20,7 +20,7 @@ interface StoryBuilderProps {
 
 export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
   const { user } = useAuth();
-  const hasSparkStep = bucket === 'personal' || bucket === 'emotional';
+  const hasSparkStep = bucket === 'personal' || bucket === 'business' || bucket === 'emotional';
   const [currentStep, setCurrentStep] = useState(hasSparkStep ? 0 : 1);
   const [stepContent, setStepContent] = useState<Record<number, string>>({});
   const [isEditing, setIsEditing] = useState(false);

@@ -162,7 +162,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
     }));
   };
 
-  const checkAuthenticity = async (text: string): Promise<{ needsRefinement: boolean; softNudge?: string }> => {
+  const checkAuthenticity = async (text: string, step: number): Promise<{ needsRefinement: boolean; hookDetected?: boolean; ctaDetected?: boolean; softNudge?: string }> => {
     try {
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-authenticity`,
@@ -172,7 +172,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, step }),
         }
       );
 
@@ -186,7 +186,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
         throw new Error(data.error);
       }
 
-      return { needsRefinement: data.needsRefinement, softNudge: data.softNudge };
+      return { needsRefinement: data.needsRefinement, hookDetected: data.hookDetected, ctaDetected: data.ctaDetected, softNudge: data.softNudge };
     } catch (error) {
       console.error("Authenticity check error:", error);
       return { needsRefinement: false };
@@ -317,19 +317,30 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
       return;
     }
 
-    // Run coach check on Step 1
-    if (currentStep === 1) {
-      setIsCheckingAuthenticity(true);
-      
-      const result = await checkAuthenticity(currentContent);
-      
-      setIsCheckingAuthenticity(false);
-      
-      if (result.needsRefinement) {
-        setCoachNudgeMessage(result.softNudge);
-        setShowCoachNudge(true);
-        return;
-      }
+    // Run coach check on every step
+    setIsCheckingAuthenticity(true);
+    
+    const result = await checkAuthenticity(currentContent, currentStep);
+    
+    setIsCheckingAuthenticity(false);
+
+    // Show non-blocking warning for hooks/CTAs
+    if (result.hookDetected || result.ctaDetected) {
+      const warnings = [
+        result.hookDetected && "hook detected",
+        result.ctaDetected && "call to action detected",
+      ].filter(Boolean).join(" & ");
+      toast({
+        title: warnings.toUpperCase(),
+        description: "this will significantly hurt your final score. consider removing it.",
+      });
+    }
+    
+    // Only block on step 1 for authenticity refinement
+    if (currentStep === 1 && result.needsRefinement) {
+      setCoachNudgeMessage(result.softNudge);
+      setShowCoachNudge(true);
+      return;
     }
 
     // Proceed to next step

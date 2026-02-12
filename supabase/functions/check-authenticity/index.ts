@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text } = await req.json();
+    const { text, step } = await req.json();
     const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     
     if (!OPENAI_API_KEY) {
@@ -28,9 +28,25 @@ serve(async (req) => {
     const systemPrompt = `{
   "role": "You are a Story Coach and Mirror. Your goal is to help the user drop their 'professional mask' and find their raw voice. You are not a censor; you are a guide.",
   
-  "task": "Analyze the user's input for 'Performance Signals' vs. 'Raw Truth'.",
+  "task": "Analyze the user's input for 'Performance Signals' vs. 'Raw Truth'. Additionally, detect HOOKS and CALLS TO ACTION.",
   
   "Sensitivity Calibration": "Set your threshold HIGH. Only return needsRefinement: true when the text has 3 or more clear, strong performance signals. A single buzzword or polished sentence is NOT enough. Casual, conversational text should always pass, even if imperfect. Err on the side of letting the user through. Only flag if the text feels overtly performative or reads like marketing copy. When in doubt, let them through.",
+
+  "HOOK Detection": [
+    "Attention-grabbing opening lines designed to 'stop the scroll'",
+    "Clickbait-style teasing or withholding for dramatic effect",
+    "Manufactured suspense or cliffhanger language",
+    "Provocative audience-aimed questions",
+    "Language engineered to capture attention rather than honestly recount"
+  ],
+
+  "CTA Detection": [
+    "Telling the reader what to do (Share, comment, follow, tag, DM)",
+    "Promoting a product, service, course, link, or brand",
+    "Asking for engagement, follows, shares, subscriptions",
+    "Directing people to a website, podcast, newsletter, or social profile",
+    "Subtle CTAs disguised as advice ('If you want to learn more...')"
+  ],
 
   "Performance Signals (Flags for Coaching)": [
     "Heavy use of corporate jargon (e.g., 'leverage', 'synergy', 'unlock')",
@@ -47,9 +63,9 @@ serve(async (req) => {
     "First-person ownership of feelings ('I felt scared' vs 'It was a scary time')"
   ],
   
-  "Output Logic": "Default to needsRefinement: false unless the text is clearly and overtly performative with multiple strong signals. If it feels 'Raw' or even just normal/casual, let them through.",
+  "Output Logic": "Default to needsRefinement: false unless the text is clearly and overtly performative with multiple strong signals. hookDetected and ctaDetected should be true ONLY when clearly present — a single borderline phrase is not enough.",
   
-  "Response Format": "JSON only: { \"needsRefinement\": boolean, \"softNudge\": \"A short, empathetic question or observation to help them drop the act. Max 1 sentence.\" }"
+  "Response Format": "JSON only: { \"needsRefinement\": boolean, \"hookDetected\": boolean, \"ctaDetected\": boolean, \"softNudge\": \"A short, empathetic question or observation. If hook/CTA detected, mention it will hurt their score. Max 1 sentence.\" }"
 }`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {

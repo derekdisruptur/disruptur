@@ -5,6 +5,7 @@ import { VoiceRecordButton } from "./VoiceRecordButton";
 import { StepProgress } from "./StepIndicator";
 import { StoryCoachNudge } from "./StoryCoachNudge";
 import { ScoreDisplay } from "./ScoreDisplay";
+import { InspirationImageUpload } from "./InspirationImageUpload";
 import { STORY_STEPS, StoryBucket, StoryScores } from "@/types/story";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,6 +37,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
   const [scores, setScores] = useState<StoryScores & { summary?: string } | null>(null);
   const [showScoreDisplay, setShowScoreDisplay] = useState(false);
 
+  const [inspirationImageUrl, setInspirationImageUrl] = useState<string | null>(null);
   const [isLoadingDraft, setIsLoadingDraft] = useState(!!storyId);
 
   const currentStepConfig = STORY_STEPS[currentStep - 1];
@@ -74,6 +76,9 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
         setCurrentStep(data.current_step);
         setDbStoryId(data.id);
         setIsEditing(true);
+        if (data.inspiration_image_url) {
+          setInspirationImageUrl(data.inspiration_image_url);
+        }
       }
       setIsLoadingDraft(false);
     }
@@ -96,6 +101,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
           title: null,
           content_json: stepContent,
           current_step: currentStep,
+          inspiration_image_url: inspirationImageUrl,
         })
         .select()
         .single();
@@ -127,6 +133,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
         title: stepContent[1]?.slice(0, 100) || null,
         content_json: stepContent,
         current_step: currentStep,
+        inspiration_image_url: inspirationImageUrl,
       })
       .eq('id', dbStoryId);
 
@@ -134,7 +141,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
       console.error('Error saving story:', error);
     }
     setIsSaving(false);
-  }, [dbStoryId, stepContent, currentStep, user]);
+  }, [dbStoryId, stepContent, currentStep, user, inspirationImageUrl]);
 
   // Debounced auto-save
   useEffect(() => {
@@ -145,7 +152,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [stepContent, currentStep, saveStory, dbStoryId]);
+  }, [stepContent, currentStep, saveStory, dbStoryId, inspirationImageUrl]);
 
   const handleTranscription = useCallback((text: string) => {
     setStepContent(prev => ({
@@ -457,6 +464,17 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
               {currentStepConfig.prompt}
             </p>
           </div>
+
+          {/* Inspiration Image - shown on step 1 */}
+          {currentStep === 1 && (
+            <div className="mb-8">
+              <InspirationImageUpload
+                imageUrl={inspirationImageUrl}
+                onImageChange={setInspirationImageUrl}
+                disabled={isProcessing}
+              />
+            </div>
+          )}
 
           {/* Input Area */}
           <div className="space-y-6">

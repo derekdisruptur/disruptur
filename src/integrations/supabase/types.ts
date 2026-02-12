@@ -85,6 +85,7 @@ export type Database = {
           created_at: string
           current_step: number
           id: string
+          inspiration_image_url: string | null
           scores_json: Json | null
           status: Database["public"]["Enums"]["story_status"]
           title: string | null
@@ -97,6 +98,7 @@ export type Database = {
           created_at?: string
           current_step?: number
           id?: string
+          inspiration_image_url?: string | null
           scores_json?: Json | null
           status?: Database["public"]["Enums"]["story_status"]
           title?: string | null
@@ -109,6 +111,7 @@ export type Database = {
           created_at?: string
           current_step?: number
           id?: string
+          inspiration_image_url?: string | null
           scores_json?: Json | null
           status?: Database["public"]["Enums"]["story_status"]
           title?: string | null

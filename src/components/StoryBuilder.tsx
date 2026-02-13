@@ -315,6 +315,7 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
           vulnerability: storyScores.vulnerability,
           credibility: storyScores.credibility,
           cringeRisk: storyScores.cringeRisk,
+          platformPlay: storyScores.platformPlay,
         },
       })
       .eq('id', dbStoryId);

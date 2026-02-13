@@ -278,6 +278,21 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
   const handleComplete = async () => {
     if (!canProceed || !dbStoryId) return;
 
+    // Check if story is already locked to prevent duplicate submissions
+    const { data: freshStory } = await supabase
+      .from('stories')
+      .select('status')
+      .eq('id', dbStoryId)
+      .single();
+
+    if (freshStory?.status === 'locked') {
+      toast({
+        title: "ALREADY LOCKED",
+        description: "this story has already been scored and locked.",
+      });
+      return;
+    }
+
     setIsScoring(true);
     
     const storyScores = await scoreStory();

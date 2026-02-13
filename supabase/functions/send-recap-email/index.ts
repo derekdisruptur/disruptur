@@ -21,7 +21,7 @@ const STEP_TITLES = [
 ];
 
 function buildEmailHtml(
-  scores: { authenticity: number; vulnerability: number; credibility: number; cringeRisk: number; summary?: string },
+  scores: { authenticity: number; vulnerability: number; credibility: number; cringeRisk: number; platformPlay?: number; summary?: string },
   content: Record<string, string>,
   bucket: string,
 ) {
@@ -71,11 +71,12 @@ function buildEmailHtml(
     <div style="background:#111;border:1px solid #333;border-radius:8px;padding:24px;margin-bottom:24px;">
       <h2 style="font-family:monospace;font-size:14px;color:#888;margin:0 0 16px;text-transform:uppercase;">Score Breakdown</h2>
       <table style="width:100%;border-collapse:collapse;">
-        ${scoreBar("Authenticity", scores.authenticity)}
-        ${scoreBar("Vulnerability", scores.vulnerability)}
-        ${scoreBar("Credibility", scores.credibility)}
-        ${scoreBar("Cringe Risk", scores.cringeRisk, true)}
-      </table>
+         ${scoreBar("Authenticity", scores.authenticity)}
+         ${scoreBar("Vulnerability", scores.vulnerability)}
+         ${scoreBar("Credibility", scores.credibility)}
+         ${scoreBar("Cringe Risk", scores.cringeRisk, true)}
+         ${scores.platformPlay !== undefined ? scoreBar("Platform Play", scores.platformPlay, true) : ""}
+       </table>
     </div>
 
     <div style="background:#111;border:1px solid #333;border-radius:8px;padding:24px;margin-bottom:24px;">

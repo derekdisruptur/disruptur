@@ -279,18 +279,27 @@ export function StoryBuilder({ onBack, bucket, storyId }: StoryBuilderProps) {
     if (!canProceed || !dbStoryId) return;
 
     // Check if story is already locked to prevent duplicate submissions
-    const { data: freshStory } = await supabase
-      .from('stories')
-      .select('status')
-      .eq('id', dbStoryId)
-      .single();
+    try {
+      const { data: freshStory, error: fetchError } = await supabase
+        .from('stories')
+        .select('status')
+        .eq('id', dbStoryId)
+        .single();
 
-    if (freshStory?.status === 'locked') {
-      toast({
-        title: "ALREADY LOCKED",
-        description: "this story has already been scored and locked.",
-      });
-      return;
+      if (fetchError) {
+        console.error('Error fetching story status:', fetchError);
+      }
+
+      if (freshStory?.status === 'locked') {
+        toast({
+          title: "ALREADY LOCKED",
+          description: "this story has already been scored and locked.",
+        });
+        return;
+      }
+    } catch (err) {
+      console.error('Status check error:', err);
+      // Continue anyway - don't block on status check failure
     }
 
     setIsScoring(true);

@@ -6,6 +6,7 @@ interface ScoreDisplayProps {
     vulnerability: number;
     credibility: number;
     cringeRisk: number;
+    platformPlay: number;
     summary?: string;
   };
   onClose: () => void;
@@ -52,7 +53,7 @@ function ScoreGauge({ label, value, inverted }: ScoreGaugeProps) {
 
 export function ScoreDisplay({ scores, onClose }: ScoreDisplayProps) {
   const overallScore = Math.round(
-    (scores.authenticity + scores.vulnerability + scores.credibility + (100 - scores.cringeRisk)) / 4
+    (scores.authenticity + scores.vulnerability + scores.credibility + (100 - scores.cringeRisk) + (100 - scores.platformPlay)) / 5
   );
 
   return (
@@ -79,13 +80,14 @@ export function ScoreDisplay({ scores, onClose }: ScoreDisplayProps) {
             </div>
           </div>
 
-          {/* Individual Scores */}
-          <div className="space-y-6">
-            <ScoreGauge label="AUTHENTICITY" value={scores.authenticity} />
-            <ScoreGauge label="VULNERABILITY" value={scores.vulnerability} />
-            <ScoreGauge label="CREDIBILITY" value={scores.credibility} />
-            <ScoreGauge label="CRINGE RISK" value={scores.cringeRisk} inverted />
-          </div>
+           {/* Individual Scores */}
+           <div className="space-y-6">
+             <ScoreGauge label="AUTHENTICITY" value={scores.authenticity} />
+             <ScoreGauge label="VULNERABILITY" value={scores.vulnerability} />
+             <ScoreGauge label="CREDIBILITY" value={scores.credibility} />
+             <ScoreGauge label="CRINGE RISK" value={scores.cringeRisk} inverted />
+             <ScoreGauge label="PLATFORM PLAY" value={scores.platformPlay} inverted />
+           </div>
 
           {/* Summary */}
           {scores.summary && (

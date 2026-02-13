@@ -31,7 +31,7 @@ serve(async (req) => {
       .map(([step, text]) => `Step ${step}: ${text}`)
       .join("\n\n");
 
-    const systemPrompt = `You are a story analyst for The Sanctuary — a platform for raw, unfiltered personal stories. Score this story on 4 dimensions from 0-100.
+    const systemPrompt = `You are a story analyst for The Sanctuary — a platform for raw, unfiltered personal stories. Score this story on 5 dimensions from 0-100.
 
 CRITICAL VIOLATIONS — These should dramatically impact scores:
 
@@ -49,6 +49,18 @@ CALLS TO ACTION (severely penalize):
 - Directing people to a website, podcast, newsletter, or social profile
 - "DM me", "Link in bio", "Check out my..."
 - Subtle CTAs disguised as advice ("If you want to learn more about X...")
+
+PLATFORM PLAY (severely penalize - 0-100 scale where higher = worse):
+- Revenue/achievement flexing ("$1M business", "$100k/mo", company valuations, client metrics)
+- "I was told I'd never..." humble-bragging structure where failure is setup for success story
+- Direct engagement tactics ("Comment X", "Drop a comment", "What do you think?", rhetorical questions designed to prompt replies)
+- Fake authority/manufactured expertise ("Trust me", "I've done this for 1000s", self-aggrandizing titles)
+- Affiliate links, sponsorships, or product promotions disguised as advice
+- Artificial formatting for engagement (excessive line breaks, single-word lines, emoji)
+- Forced "casual" sign-offs designed to seem relatable ("Cheers! 😊", "Let's go!", "We're cooking")
+- "Teaching" or "advice" that's really a sales pitch for a service/course
+- Fake vulnerability followed by immediate bragging
+- Asking leading questions to manufacture engagement (e.g., "What do you think the strategy is?")
 
 SCORING CRITERIA:
 
@@ -72,12 +84,19 @@ SCORING CRITERIA:
    - Low (good): Natural voice, earned insights, proportional emotion
    - PENALTY: Any hook adds +25 to cringe risk. Any CTA adds +30 to cringe risk. Both together = cap at 85 minimum.
 
+5. PLATFORM PLAY (0-100, higher = worse):
+   - High (bad): Heavy revenue flexing, fake humility, engagement-bait tactics, fake authority
+   - Low (good): No engagement tactics, genuine story without agenda, no promotional elements
+   - DETECTION: Look for metric-dropping, rhetorical questions, manufactured defiance, forced relatability, affiliate links
+   - PENALTY: Platform Play directly reduces authenticity and vulnerability scores by up to 30 points each
+
 Return JSON only:
 {
   "authenticity": number,
   "vulnerability": number,
   "credibility": number,
   "cringeRisk": number,
+  "platformPlay": number,
   "hookDetected": boolean,
   "ctaDetected": boolean,
   "summary": "One sentence overall assessment"
@@ -126,6 +145,7 @@ Return JSON only:
         vulnerability: 70,
         credibility: 70,
         cringeRisk: 30,
+        platformPlay: 30,
         summary: "Unable to analyze story"
       };
     }

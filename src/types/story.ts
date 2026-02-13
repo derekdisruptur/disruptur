@@ -7,6 +7,7 @@ export interface StoryScores {
   vulnerability: number;
   credibility: number;
   cringeRisk: number;
+  platformPlay: number;
 }
 
 export interface Story {

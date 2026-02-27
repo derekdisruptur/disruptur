@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.send-recap-email]
 verify_jwt = false
+
+[functions.send-unfinished-reminders]
+verify_jwt = false

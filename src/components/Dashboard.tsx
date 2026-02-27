@@ -7,6 +7,7 @@ import { BucketSelector } from "./BucketSelector";
 import { StoryBuilder } from "./StoryBuilder";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { PublishedReview } from "./PublishedReview";
 import { Story, StoryBucket } from "@/types/story";
 
 type FilterType = 'all' | StoryBucket;
@@ -18,6 +19,7 @@ export function Dashboard() {
   const [showBucketSelector, setShowBucketSelector] = useState(false);
   const [selectedBucket, setSelectedBucket] = useState<StoryBucket | null>(null);
   const [activeStoryId, setActiveStoryId] = useState<string | null>(null);
+  const [reviewStoryId, setReviewStoryId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Fetch stories from database
@@ -121,6 +123,19 @@ export function Dashboard() {
     return <StoryBuilder bucket={selectedBucket} onBack={handleBackFromBuilder} />;
   }
 
+  // Show Published Review
+  if (reviewStoryId) {
+    return (
+      <PublishedReview
+        storyId={reviewStoryId}
+        onBack={() => {
+          setReviewStoryId(null);
+          handleBackFromBuilder();
+        }}
+      />
+    );
+  }
+
   // Show Bucket Selector
   if (showBucketSelector) {
     return (
@@ -213,6 +228,7 @@ export function Dashboard() {
                   key={story.id}
                   story={story}
                   onClick={() => handleStoryClick(story)}
+                  onReview={story.status === 'locked' ? () => setReviewStoryId(story.id) : undefined}
                 />
               ))}
             </div>

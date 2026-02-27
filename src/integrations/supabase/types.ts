@@ -78,6 +78,41 @@ export type Database = {
           },
         ]
       }
+      story_reviews: {
+        Row: {
+          id: string
+          story_id: string
+          user_id: string
+          published_text: string
+          review_json: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          story_id: string
+          user_id: string
+          published_text: string
+          review_json: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          story_id?: string
+          user_id?: string
+          published_text?: string
+          review_json?: Json
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "story_reviews_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stories: {
         Row: {
           bucket: Database["public"]["Enums"]["story_bucket"]

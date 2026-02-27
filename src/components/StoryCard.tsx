@@ -5,6 +5,7 @@ import { ArrowRight, FileText } from "lucide-react";
 interface StoryCardProps {
   story: Story;
   onClick: () => void;
+  onReview?: () => void;
 }
 
 const bucketLabels: Record<StoryBucket, string> = {
@@ -13,7 +14,7 @@ const bucketLabels: Record<StoryBucket, string> = {
   emotional: "INDUSTRY",
 };
 
-export function StoryCard({ story, onClick }: StoryCardProps) {
+export function StoryCard({ story, onClick, onReview }: StoryCardProps) {
   const progressPercent = Math.round((story.currentStep / 12) * 100);
 
   return (
@@ -71,7 +72,20 @@ export function StoryCard({ story, onClick }: StoryCardProps) {
               }).toUpperCase()}
             </span>
           </div>
-          <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+          <div className="flex items-center gap-2">
+            {story.status === 'locked' && onReview && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReview();
+                }}
+                className="font-mono text-[10px] uppercase px-2 py-1 border border-muted text-muted-foreground hover:border-foreground hover:text-foreground transition-colors"
+              >
+                REVIEW PUBLISHED
+              </button>
+            )}
+            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+          </div>
         </div>
       </div>
     </button>

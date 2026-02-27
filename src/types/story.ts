@@ -38,6 +38,31 @@ export interface StoryContent {
   step12?: string;
 }
 
+export interface PublishedReviewResult {
+  // Same 5 dimensions as StoryScores (directly comparable)
+  authenticity: number;
+  vulnerability: number;
+  credibility: number;
+  cringeRisk: number;
+  platformPlay: number;
+  // Comparison-specific fields
+  fidelityScore: number;
+  hookExamples: string[];
+  ctaExamples: string[];
+  marketingExamples: string[];
+  credibilityRiskExamples: string[];
+  summary: string;
+}
+
+export interface StoryReview {
+  id: string;
+  storyId: string;
+  userId: string;
+  publishedText: string;
+  review: PublishedReviewResult;
+  createdAt: Date;
+}
+
 export interface StepConfig {
   number: number;
   title: string;

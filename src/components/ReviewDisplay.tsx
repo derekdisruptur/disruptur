@@ -186,7 +186,7 @@ export function ReviewDisplay({ review, onClose, onAnalyzeAnother }: ReviewDispl
     (review.credibilityRiskExamples?.length > 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-background overflow-y-auto">
       {/* Phase 0 — Analyzing pulse */}
       <div
         className={cn(
@@ -202,7 +202,7 @@ export function ReviewDisplay({ review, onClose, onAnalyzeAnother }: ReviewDispl
       {/* Main reveal container */}
       <div
         className={cn(
-          "w-full max-w-xl mx-4 my-8 transition-all duration-700",
+          "w-full max-w-xl mx-auto px-4 py-12 transition-all duration-700",
           phase >= 1 ? "opacity-100" : "opacity-0 scale-95"
         )}
       >
